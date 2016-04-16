@@ -53,7 +53,9 @@
 // operating systems.
 #define SUPPORT_ENDPOINT_HALT
 
-
+// Default set to 6 in original Teesy software
+// This had been modified to increase NKRO
+#define MAX_NUM_KEYS 6
 
 /**************************************************************************
  *
@@ -240,8 +242,9 @@ static volatile uint8_t usb_configuration=0;
 // 16=right ctrl, 32=right shift, 64=right alt, 128=right gui
 uint8_t keyboard_modifier_keys=0;
 
-// which keys are currently pressed, up to 6 keys may be down at once
-uint8_t keyboard_keys[6]={0,0,0,0,0,0};
+// which keys are currently pressed, up to MAX_NUM_KEYS keys may be down at once
+// intialize all elements to zero at the start of your program !!
+uint8_t keyboard_keys[MAX_NUM_KEYS];
 
 // protocol setting from the host.  We use exactly the same report
 // either way, so this variable only stores the setting since we
@@ -327,7 +330,7 @@ int8_t usb_keyboard_send(void)
 	}
 	UEDATX = keyboard_modifier_keys;
 	UEDATX = 0;
-	for (i=0; i<6; i++) {
+	for (i=0; i<MAX_NUM_KEYS; i++) {
 		UEDATX = keyboard_keys[i];
 	}
 	UEINTX = 0x3A;
@@ -371,7 +374,7 @@ ISR(USB_GEN_vect)
 					keyboard_idle_count = 0;
 					UEDATX = keyboard_modifier_keys;
 					UEDATX = 0;
-					for (i=0; i<6; i++) {
+					for (i=0; i<MAX_NUM_KEYS; i++) {
 						UEDATX = keyboard_keys[i];
 					}
 					UEINTX = 0x3A;
@@ -545,7 +548,7 @@ ISR(USB_COM_vect)
 					usb_wait_in_ready();
 					UEDATX = keyboard_modifier_keys;
 					UEDATX = 0;
-					for (i=0; i<6; i++) {
+					for (i=0; i<MAX_NUM_KEYS; i++) {
 						UEDATX = keyboard_keys[i];
 					}
 					usb_send_in();
