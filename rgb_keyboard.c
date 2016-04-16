@@ -32,25 +32,27 @@
 #define LED_OFF		(PORTD |= (1<<6))
 #define CPU_PRESCALE(n)	(CLKPR = 0x80, CLKPR = (n))
 
-uint8_t number_keys[10]=
-	{KEY_0,KEY_1,KEY_2,KEY_3,KEY_4,KEY_5,KEY_6,KEY_7,KEY_8,KEY_9};
+#define NUM_IN 8
+#define NUM_OUT 8
 
-uint16_t idle_count=0;
+uint16_t idle_count = 0;
+uint8_t key_count = 0;
+
+uint8_t key_map (uint8_t, uint8_t);
 
 int main(void)
 {
-	uint8_t b, d, mask, i, reset_idle;
+	uint8_t b, d, i, j, mask, reset_idle;
 	uint8_t b_prev=0xFF, d_prev=0xFF;
 
 	// set for 16 MHz clock
 	CPU_PRESCALE(0);
 
-	// Configure all port B and port D pins as inputs with pullup resistors.
-	// See the "Using I/O Pins" page for details.
-	// http://www.pjrc.com/teensy/pins.html
+	// Configure PORTB as outputd
+	DDRB = 0xFF;
+	PORTB = 0x00;
+	// Configure PORTD as inputs
 	DDRD = 0x00;
-	DDRB = 0x00;
-	PORTB = 0xFF;
 	PORTD = 0xFF;
 
 	// Initialize the USB, and then wait for the host to set configuration.
@@ -72,25 +74,31 @@ int main(void)
 	TIMSK0 = (1<<TOIE0);
 
 	while (1) {
-		// read all port B and port D pins
-		b = PINB;
+
+		// initialize keyboard_keys array
+		key_count = 0;
+		for (i = 0; i < MAX_NUM_KEYS; i++)
+			keyboard_keys[i] = 0;
+
+		// read all port D pins
 		d = PIND;
+
 		// check if any pins are low, but were high previously
-		mask = 1;
 		reset_idle = 0;
-		for (i=0; i<8; i++) {
-			if (((b & mask) == 0) && (b_prev & mask) != 0) {
-				usb_keyboard_press(KEY_B, KEY_SHIFT);
-				usb_keyboard_press(number_keys[i], 0);
-				reset_idle = 1;
-			}
-			if (((d & mask) == 0) && (d_prev & mask) != 0) {
-				usb_keyboard_press(KEY_D, KEY_SHIFT);
-				usb_keyboard_press(number_keys[i], 0);
-				reset_idle = 1;
-			}
+		for (i = 0; i < NUM_IN; i++) {
+			PORTB = 1 << i;
+			mask = 1;
+			for (j = 0; j < NUM_OUT; j++) {
+				if (((d & mask) == 0) && (d_prev & mask) != 0) {
+					keyboard_keys[key_count] = key_map(i,j);
+					reset_idle = 1;
+					key_count++;
+				}
 			mask = mask << 1;
+			}
 		}
+		usb_keyboard_send();
+
 		// if any keypresses were detected, reset the idle counter
 		if (reset_idle) {
 			// variables shared with interrupt routines must be
@@ -103,7 +111,6 @@ int main(void)
 		// now the current pins will be the previous, and
 		// wait a short delay so we're not highly sensitive
 		// to mechanical "bounce".
-		b_prev = b;
 		d_prev = d;
 		_delay_ms(2);
 	}
@@ -122,3 +129,97 @@ ISR(TIMER0_OVF_vect)
 }
 
 
+
+uint8_t key_map (uint8_t b, uint8_t d)
+{
+	switch (d) {
+		case 0:	switch (b) {
+					case 0: return
+					case 1: return
+					case 2: return
+					case 3: return
+					case 4: return
+					case 5: return
+					case 6: return
+					case 7: return
+					default: return 0;
+				}
+		case 1: switch (b) {
+					case 0: return
+					case 1: return
+					case 2: return
+					case 3: return
+					case 4: return
+					case 5: return
+					case 6: return
+					case 7: return
+					default: return 0;
+				}
+		case 2: switch (b) {
+					case 0: return
+					case 1: return
+					case 2: return
+					case 3: return
+					case 4: return
+					case 5: return
+					case 6: return
+					case 7: return
+					default: return 0;
+				}
+		case 3: switch (b) {
+					case 0: return
+					case 1: return
+					case 2: return
+					case 3: return
+					case 4: return
+					case 5: return
+					case 6: return
+					case 7: return
+					default: return 0;
+				}
+		case 4: switch (b) {
+					case 0: return
+					case 1: return
+					case 2: return
+					case 3: return
+					case 4: return
+					case 5: return
+					case 6: return
+					case 7: return
+					default: return 0;
+				}
+		case 5: switch (b) {
+					case 0: return
+					case 1: return
+					case 2: return
+					case 3: return
+					case 4: return
+					case 5: return
+					case 6: return
+					case 7: return
+					default: return 0;
+				}
+		case 6: switch (b) {
+					case 0: return
+					case 1: return
+					case 2: return
+					case 3: return
+					case 4: return
+					case 5: return
+					case 6: return
+					case 7: return
+					default: return 0;
+				}
+		case 7: switch (b) {
+					case 0: return
+					case 1: return
+					case 2: return
+					case 3: return
+					case 4: return
+					case 5: return
+					case 6: return
+					case 7: return
+					default: return 0;
+				}
+	}
+}
