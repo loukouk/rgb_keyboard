@@ -100,6 +100,7 @@ int main(void)
 		rgb[i][RED]   = 0b00001111;
 		rgb[i][GREEN] = 0b00110011;
 		rgb[i][BLUE]  = 0b01010101;
+	}
 
 	while (1) {
 		
@@ -117,9 +118,10 @@ int main(void)
 ISR(TIMER0_OVF_vect)
 {
 	static uint8_t key_count = 0, cycle_count = 0;
-	static key_matrix_out[KEY_MATRIX_IN];
+	static uint8_t key_matrix_out[KEY_MATRIX_IN];
+	uint8_t i;
 
-	key_matrix_out = ((PINB & 0x70) >> 4) || ((PINE & 0xC0) >> 3);
+	key_matrix_out[cycle_count] = ((PINB & 0x70) >> 4) || ((PINE & 0xC0) >> 3);
 
 	for (i = 0; i < KEY_MATRIX_OUT; i++) {
 		if ((key_matrix_out[cycle_count] & (1 << i)) == 0 && key_count < MAX_NUM_KEYS) {

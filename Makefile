@@ -388,7 +388,8 @@ ALL_ASFLAGS = -mmcu=$(MCU) -I. -x assembler-with-cpp $(ASFLAGS)
 
 
 
-
+default:
+	make all >> $(TARGET).out
 
 # Default target.
 all: begin gccversion sizebefore build sizeafter end
@@ -585,6 +586,7 @@ clean: begin clean_list end
 clean_list :
 	@echo
 	@echo $(MSG_CLEANING)
+	$(REMOVE) $(TARGET).out
 	$(REMOVE) $(TARGET).hex
 	$(REMOVE) $(TARGET).eep
 	$(REMOVE) $(TARGET).cof
