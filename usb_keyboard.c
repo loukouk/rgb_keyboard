@@ -53,9 +53,6 @@
 // operating systems.
 #define SUPPORT_ENDPOINT_HALT
 
-// Default set to 6 in original Teesy software
-// This had been modified to increase NKRO
-#define MAX_NUM_KEYS 6
 
 /**************************************************************************
  *
@@ -91,7 +88,7 @@ static const uint8_t PROGMEM endpoint_config_table[] = {
 // spec and relevant portions of any USB class specifications!
 
 
-static uint8_t PROGMEM device_descriptor[] = {
+static const uint8_t PROGMEM device_descriptor[] = {
 	18,					// bLength
 	1,					// bDescriptorType
 	0x00, 0x02,				// bcdUSB
@@ -109,7 +106,7 @@ static uint8_t PROGMEM device_descriptor[] = {
 };
 
 // Keyboard Protocol 1, HID 1.11 spec, Appendix B, page 59-60
-static uint8_t PROGMEM keyboard_hid_report_desc[] = {
+static const uint8_t PROGMEM keyboard_hid_report_desc[] = {
         0x05, 0x01,          // Usage Page (Generic Desktop),
         0x09, 0x06,          // Usage (Keyboard),
         0xA1, 0x01,          // Collection (Application),
@@ -146,7 +143,7 @@ static uint8_t PROGMEM keyboard_hid_report_desc[] = {
 
 #define CONFIG1_DESC_SIZE        (9+9+9+7)
 #define KEYBOARD_HID_DESC_OFFSET (9+9)
-static uint8_t PROGMEM config1_descriptor[CONFIG1_DESC_SIZE] = {
+static const uint8_t PROGMEM config1_descriptor[CONFIG1_DESC_SIZE] = {
 	// configuration descriptor, USB spec 9.6.3, page 264-266, Table 9-10
 	9, 					// bLength;
 	2,					// bDescriptorType;
@@ -193,17 +190,17 @@ struct usb_string_descriptor_struct {
 	uint8_t bDescriptorType;
 	int16_t wString[];
 };
-static struct usb_string_descriptor_struct PROGMEM string0 = {
+static const struct usb_string_descriptor_struct PROGMEM string0 = {
 	4,
 	3,
 	{0x0409}
 };
-static struct usb_string_descriptor_struct PROGMEM string1 = {
+static const struct usb_string_descriptor_struct PROGMEM string1 = {
 	sizeof(STR_MANUFACTURER),
 	3,
 	STR_MANUFACTURER
 };
-static struct usb_string_descriptor_struct PROGMEM string2 = {
+static const struct usb_string_descriptor_struct PROGMEM string2 = {
 	sizeof(STR_PRODUCT),
 	3,
 	STR_PRODUCT
@@ -211,7 +208,7 @@ static struct usb_string_descriptor_struct PROGMEM string2 = {
 
 // This table defines which descriptor data is sent for each specific
 // request from the host (in wValue and wIndex).
-static struct descriptor_list_struct {
+static const struct descriptor_list_struct {
 	uint16_t	wValue;
 	uint16_t	wIndex;
 	const uint8_t	*addr;
@@ -242,8 +239,7 @@ static volatile uint8_t usb_configuration=0;
 // 16=right ctrl, 32=right shift, 64=right alt, 128=right gui
 uint8_t keyboard_modifier_keys=0;
 
-// which keys are currently pressed, up to MAX_NUM_KEYS keys may be down at once
-// intialize all elements to zero at the start of your program !!
+// which keys are currently pressed, up to 6 keys may be down at once
 uint8_t keyboard_keys[MAX_NUM_KEYS];
 
 // protocol setting from the host.  We use exactly the same report
@@ -330,7 +326,7 @@ int8_t usb_keyboard_send(void)
 	}
 	UEDATX = keyboard_modifier_keys;
 	UEDATX = 0;
-	for (i=0; i<MAX_NUM_KEYS; i++) {
+	for (i=0; i<6; i++) {
 		UEDATX = keyboard_keys[i];
 	}
 	UEINTX = 0x3A;
@@ -352,7 +348,7 @@ int8_t usb_keyboard_send(void)
 //
 ISR(USB_GEN_vect)
 {
-	uint8_t intbits, t, i;
+	uint8_t intbits, i;
 	static uint8_t div4=0;
 
         intbits = UDINT;
@@ -374,7 +370,7 @@ ISR(USB_GEN_vect)
 					keyboard_idle_count = 0;
 					UEDATX = keyboard_modifier_keys;
 					UEDATX = 0;
-					for (i=0; i<MAX_NUM_KEYS; i++) {
+					for (i=0; i<6; i++) {
 						UEDATX = keyboard_keys[i];
 					}
 					UEINTX = 0x3A;
@@ -548,7 +544,7 @@ ISR(USB_COM_vect)
 					usb_wait_in_ready();
 					UEDATX = keyboard_modifier_keys;
 					UEDATX = 0;
-					for (i=0; i<MAX_NUM_KEYS; i++) {
+					for (i=0; i<6; i++) {
 						UEDATX = keyboard_keys[i];
 					}
 					usb_send_in();
