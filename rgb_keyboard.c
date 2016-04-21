@@ -32,28 +32,45 @@
 #define LED_OFF		(PORTD |= (1<<6))
 #define CPU_PRESCALE(n)	(CLKPR = 0x80, CLKPR = (n))
 
-#define NUM_IN 8
-#define NUM_OUT 8
+#define RED   0
+#define GREEN 1
+#define BLUE  2
 
-uint16_t idle_count = 0;
+//You need to change some source code after editing these values
+#define KEY_MATRIX_IN 16
+#define KEY_MATRIX_OUT 5
+#define LED_MATRIX_IN 10
+#define LED_MATRIX_OUT 8 // 24 total (3 * 8)
+
 uint8_t key_count = 0;
-
 uint8_t key_map (uint8_t, uint8_t);
+uint8_t rgb[LED_MATRIX_IN][3];
 
 int main(void)
 {
-	uint8_t b, d, i, j, mask, reset_idle;
-	uint8_t b_prev=0xFF, d_prev=0xFF;
+	uint8_t i;
 
 	// set for 16 MHz clock
 	CPU_PRESCALE(0);
 
-	// Configure PORTB as outputd
-	DDRB = 0xFF;
-	PORTB = 0x00;
-	// Configure PORTD as inputs
-	DDRD = 0x00;
-	PORTD = 0xFF;
+	// Configure PORTA as outputs
+	DDRA = 0xFF;
+	PORTA = 0x00;
+	// Configure PORTB 0:3 and 7 as outputs and 4:6 as inputs
+	DDRB = 0x8F;
+	PORTB = 0x70;
+	// Configure PORTC as outputs
+	DDRD = 0xFF;
+	PORTD = 0x00;
+	// Configure PORTD as outputs
+	DDRD = 0xFF;
+	PORTD = 0x00;
+	// Configure PORTE 6:7 as inputs and 0:5 as outputs
+	DDRD = 0xFC;
+	PORTD = 0x03;
+	// Configure PORTF as outputs
+	DDRD = 0xFF;
+	PORTD = 0x00;
 
 	// Initialize the USB, and then wait for the host to set configuration.
 	// If the Teensy is powered without a PC connected to the USB port,
@@ -73,46 +90,24 @@ int main(void)
 	TCCR0B = 0x05;
 	TIMSK0 = (1<<TOIE0);
 
+	// initialize keyboard_keys array
+	key_count = 0;
+	for (i = 0; i < MAX_NUM_KEYS; i++)
+		keyboard_keys[i] = 0;
+
+
+	for (i = 0; i < LED_MATRIX_IN; i++) {
+		rgb[i][RED]   = 0b00001111;
+		rgb[i][GREEN] = 0b00110011;
+		rgb[i][BLUE]  = 0b01010101;
+
 	while (1) {
-
-		// initialize keyboard_keys array
-		key_count = 0;
-		for (i = 0; i < MAX_NUM_KEYS; i++)
-			keyboard_keys[i] = 0;
-
-		// read all port D pins
-		d = PIND;
-
-		// check if any pins are low, but were high previously
-		reset_idle = 0;
-		for (i = 0; i < NUM_IN; i++) {
-			PORTB = 1 << i;
-			mask = 1;
-			for (j = 0; j < NUM_OUT; j++) {
-				if (((d & mask) == 0) && (d_prev & mask) != 0) {
-					keyboard_keys[key_count] = key_map(i,j);
-					reset_idle = 1;
-					key_count++;
-				}
-			mask = mask << 1;
-			}
+		
+		for (i = 0; i < LED_MATRIX_IN; i++) {
+			PORTC = rgb[i][RED];
+			PORTD = rgb[i][GREEN];
+			PORTF = rgb[i][BLUE];
 		}
-		usb_keyboard_send();
-
-		// if any keypresses were detected, reset the idle counter
-		if (reset_idle) {
-			// variables shared with interrupt routines must be
-			// accessed carefully so the interrupt routine doesn't
-			// try to use the variable in the middle of our access
-			cli();
-			idle_count = 0;
-			sei();
-		}
-		// now the current pins will be the previous, and
-		// wait a short delay so we're not highly sensitive
-		// to mechanical "bounce".
-		d_prev = d;
-		_delay_ms(2);
 	}
 }
 
@@ -121,105 +116,130 @@ int main(void)
 // will send a space character.
 ISR(TIMER0_OVF_vect)
 {
-	idle_count++;
-	if (idle_count > 61 * 8) {
-		idle_count = 0;
-		usb_keyboard_press(KEY_SPACE, 0);
+	static uint8_t key_count = 0, cycle_count = 0;
+	static key_matrix_out[KEY_MATRIX_IN];
+
+	key_matrix_out = ((PINB & 0x70) >> 4) || ((PINE & 0xC0) >> 3);
+
+	for (i = 0; i < KEY_MATRIX_OUT; i++) {
+		if ((key_matrix_out[cycle_count] & (1 << i)) == 0 && key_count < MAX_NUM_KEYS) {
+			keyboard_keys[key_count] = key_map(cycle_count, i);
+			key_count++;
+		}
+	}
+
+	PORTB = cycle_count++;
+	if (cycle_count >= KEY_MATRIX_IN) {
+		usb_keyboard_send();
+		cycle_count = 0;
+		key_count = 0;
+		for (i = 0; i < MAX_NUM_KEYS; i++)
+			keyboard_keys[i] = 0;
 	}
 }
 
 
-
-uint8_t key_map (uint8_t b, uint8_t d)
+uint8_t key_map (uint8_t km_in, uint8_t km_out)
 {
-	switch (d) {
-		case 0:	switch (b) {
-					case 0: return
-					case 1: return
-					case 2: return
-					case 3: return
-					case 4: return
-					case 5: return
-					case 6: return
-					case 7: return
-					default: return 0;
-				}
-		case 1: switch (b) {
-					case 0: return
-					case 1: return
-					case 2: return
-					case 3: return
-					case 4: return
-					case 5: return
-					case 6: return
-					case 7: return
-					default: return 0;
-				}
-		case 2: switch (b) {
-					case 0: return
-					case 1: return
-					case 2: return
-					case 3: return
-					case 4: return
-					case 5: return
-					case 6: return
-					case 7: return
-					default: return 0;
-				}
-		case 3: switch (b) {
-					case 0: return
-					case 1: return
-					case 2: return
-					case 3: return
-					case 4: return
-					case 5: return
-					case 6: return
-					case 7: return
-					default: return 0;
-				}
-		case 4: switch (b) {
-					case 0: return
-					case 1: return
-					case 2: return
-					case 3: return
-					case 4: return
-					case 5: return
-					case 6: return
-					case 7: return
-					default: return 0;
-				}
-		case 5: switch (b) {
-					case 0: return
-					case 1: return
-					case 2: return
-					case 3: return
-					case 4: return
-					case 5: return
-					case 6: return
-					case 7: return
-					default: return 0;
-				}
-		case 6: switch (b) {
-					case 0: return
-					case 1: return
-					case 2: return
-					case 3: return
-					case 4: return
-					case 5: return
-					case 6: return
-					case 7: return
-					default: return 0;
-				}
-		case 7: switch (b) {
-					case 0: return
-					case 1: return
-					case 2: return
-					case 3: return
-					case 4: return
-					case 5: return
-					case 6: return
-					case 7: return
-					default: return 0;
-				}
+/*
+	switch (km_in) {
+		case 0:	switch (km_out) {
+			case 0:  return
+			case 1:  return
+			case 2:  return
+			case 3:  return
+			case 4:  return
+			case 5:  return
+			case 6:  return
+			case 7:  return
+			case 8:  return
+			case 9:  return
+			case 10: return
+			case 11: return
+			case 12: return
+			case 13: return
+			case 14: return
+			case 15: return
+			default: return 0;
+		}
+		case 1:	switch (km_out) {
+			case 0:  return
+			case 1:  return
+			case 2:  return
+			case 3:  return
+			case 4:  return
+			case 5:  return
+			case 6:  return
+			case 7:  return
+			case 8:  return
+			case 9:  return
+			case 10: return
+			case 11: return
+			case 12: return
+			case 13: return
+			case 14: return
+			case 15: return
+			default: return 0;
+		}
+		case 2:	switch (km_out) {
+			case 0:  return
+			case 1:  return
+			case 2:  return
+			case 3:  return
+			case 4:  return
+			case 5:  return
+			case 6:  return
+			case 7:  return
+			case 8:  return
+			case 9:  return
+			case 10: return
+			case 11: return
+			case 12: return
+			case 13: return
+			case 14: return
+			case 15: return
+			default: return 0;
+		}
+		case 3:	switch (km_out) {
+			case 0:  return
+			case 1:  return
+			case 2:  return
+			case 3:  return
+			case 4:  return
+			case 5:  return
+			case 6:  return
+			case 7:  return
+			case 8:  return
+			case 9:  return
+			case 10: return
+			case 11: return
+			case 12: return
+			case 13: return
+			case 14: return
+			case 15: return
+			default: return 0;
+		}
+		case 4:	switch (km_out) {
+			case 0:  return
+			case 1:  return
+			case 2:  return
+			case 3:  return
+			case 4:  return
+			case 5:  return
+			case 6:  return
+			case 7:  return
+			case 8:  return
+			case 9:  return
+			case 10: return
+			case 11: return
+			case 12: return
+			case 13: return
+			case 14: return
+			case 15: return
+			default: return 0;
+		}
+		default: return 0;
 	}
+	*/
+	return KEY_A;
 }
