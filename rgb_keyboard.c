@@ -105,9 +105,17 @@ int main(void)
 	while (1) {
 		
 		for (i = 0; i < LED_MATRIX_IN; i++) {
+
+			PORTA = i;
 			PORTC = rgb[i][RED];
 			PORTD = rgb[i][GREEN];
 			PORTF = rgb[i][BLUE];
+
+			_delay_ms(2);
+
+			PORTC = 0x00;
+			PORTD = 0x00;
+			PORTF = 0x00;
 		}
 	}
 }

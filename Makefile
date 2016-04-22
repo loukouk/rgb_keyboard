@@ -55,7 +55,7 @@ SRC =	$(TARGET).c \
 #MCU = at90usb162       # Teensy 1.0
 #MCU = atmega32u4        # Teensy 2.0
 #MCU = at90usb646       # Teensy++ 1.0
-MCU = at90usb1286      # Teensy++ 2.0
+MCU = usb1286      # Teensy++ 2.0
 
 
 # Processor frequency.
@@ -272,7 +272,7 @@ LDFLAGS += $(PRINTF_LIB) $(SCANF_LIB) $(MATH_LIB)
 AVRDUDE_PROGRAMMER = stk500v2
 
 # com1 = serial port. Use lpt1 to connect to parallel port.
-AVRDUDE_PORT = com1    # programmer connected to serial device
+AVRDUDE_PORT = com3  # programmer connected to serial device
 
 AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
 #AVRDUDE_WRITE_EEPROM = -U eeprom:w:$(TARGET).eep
