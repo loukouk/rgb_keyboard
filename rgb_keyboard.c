@@ -125,11 +125,12 @@ int main(void)
 // will send a space character.
 ISR(TIMER0_OVF_vect)
 {
-	static uint8_t key_count = 0, cycle_count = 0;
+	static uint8_t key_count = 0, cycle_count = 0, count = 0;
 	static uint8_t key_matrix_out[KEY_MATRIX_IN];
 	uint8_t i;
 
 	key_matrix_out[cycle_count] = ((PINB & 0x70) >> 4) || ((PINE & 0xC0) >> 3);
+//	key_matrix_out[cycle_count] = 1;
 
 	for (i = 0; i < KEY_MATRIX_OUT; i++) {
 		if ((key_matrix_out[cycle_count] & (1 << i)) == 0 && key_count < MAX_NUM_KEYS) {
@@ -251,5 +252,5 @@ uint8_t key_map (uint8_t km_in, uint8_t km_out)
 		default: return 0;
 	}
 	*/
-	return KEY_A;
+	return KEY_A + km_in;
 }

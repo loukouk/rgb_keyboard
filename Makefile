@@ -55,7 +55,7 @@ SRC =	$(TARGET).c \
 #MCU = at90usb162       # Teensy 1.0
 #MCU = atmega32u4        # Teensy 2.0
 #MCU = at90usb646       # Teensy++ 1.0
-MCU = usb1286      # Teensy++ 2.0
+MCU = at90usb1286      # Teensy++ 2.0
 
 
 # Processor frequency.
@@ -272,7 +272,8 @@ LDFLAGS += $(PRINTF_LIB) $(SCANF_LIB) $(MATH_LIB)
 AVRDUDE_PROGRAMMER = stk500v2
 
 # com1 = serial port. Use lpt1 to connect to parallel port.
-AVRDUDE_PORT = com3  # programmer connected to serial device
+# programmer connected to serial device
+AVRDUDE_PORT = com2
 
 AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
 #AVRDUDE_WRITE_EEPROM = -U eeprom:w:$(TARGET).eep
@@ -386,10 +387,6 @@ ALL_CFLAGS = -mmcu=$(MCU) -I. $(CFLAGS) $(GENDEPFLAGS)
 ALL_CPPFLAGS = -mmcu=$(MCU) -I. -x c++ $(CPPFLAGS) $(GENDEPFLAGS)
 ALL_ASFLAGS = -mmcu=$(MCU) -I. -x assembler-with-cpp $(ASFLAGS)
 
-
-
-default:
-	make all >> $(TARGET).out
 
 # Default target.
 all: begin gccversion sizebefore build sizeafter end
@@ -586,7 +583,6 @@ clean: begin clean_list end
 clean_list :
 	@echo
 	@echo $(MSG_CLEANING)
-	$(REMOVE) $(TARGET).out
 	$(REMOVE) $(TARGET).hex
 	$(REMOVE) $(TARGET).eep
 	$(REMOVE) $(TARGET).cof
