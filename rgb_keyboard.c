@@ -32,10 +32,9 @@
 #define LED_OFF		(PORTD |= (1<<6))
 #define CPU_PRESCALE(n)	(CLKPR = 0x80, CLKPR = (n))
 
-#define COM	0
-#define RED	1
-#define GREEN	2
-#define BLUE	3
+#define RED	0
+#define GREEN	1
+#define BLUE	2
 
 #define DEFAULT_LMODE		0
 #define TOUCH_LMODE		1
@@ -48,14 +47,13 @@
 #define KEYBOARD_HEIGHT	5
 #define KEY_MATRIX_IN 	16
 #define KEY_MATRIX_OUT 	5
-#define LED_MATRIX_OUT 	8 // cathodes
-#define LED_MATRIX_IN 	9 // anodes. Total outputs = 9*3 = 27
+#define LED_MATRIX_OUT 	9 // cathodes
+#define LED_MATRIX_IN 	8 // anodes. Total outputs = 8*3 = 24
 
 
-uint16_t rgb[LED_MATRIX_OUT][3];
-uint8_t led_on[KEYBOARD_HEIGHT][4*KEYBOARD_WIDTH];
-uint8_t led_on_prev[KEYBOARD_HEIGHT][4*KEYBOARD_WIDTH];
-uint8_t led_ports[LED_MATRIX_OUT][4];
+uint8_t rgb[LED_MATRIX_OUT][3];
+uint8_t led_arr[4*KEYBOARD_WIDTH][KEYBOARD_HEIGHT];
+uint8_t led_port[LED_MATRIX_OUT][3];
 uint8_t EDITOR_MODE = 0;
 uint8_t LIGHTING_MODE = DEFAULT_LMODE;
 
@@ -129,10 +127,10 @@ int main(void)
 		
 		for (i = 0; i < LED_MATRIX_OUT; i++) {
 
-			PORTA = led_ports[0];
-			PORTC = led_ports[1];
-			PORTD = led_ports[2];
-			PORTF = led_ports[4];
+			PORTA = i;
+			PORTC = led_port[RED];
+			PORTD = led_port[GREEN];
+			PORTF = led_port[BLUE];
 
 			_delay_ms(2);
 
@@ -144,28 +142,34 @@ int main(void)
 	}
 }
 
-// This interrupt routine is run approx 61 times per second.
-// Updates the LED lighting scheme
-ISR(TIMER0_OVF_vect)
+void editor_data_send()
 {
-	switch(LIGHTING_MODE) {
-		case TOUCH_LMODE:
-			break;
-		case LEFT_WAVE_LMODE:
-			break;
-		case RIGHT_WAVE_LMODE:
-			break;
-		case SNAKE_LMODE:
-			break;
-		default:
-			break;
+	uint8_t i, j;
+	for (i = 0; i < MAX_NUM_KEYS; i++) {
+		switch(keyboard_keys[i]) {
+			case KEY_0:		LIGHTING_MODE = DEFAULT_LMODE;
+			case KEY_1: 		LIGHTING_MODE = SNAKE_LMODE;
+			case KEY_ENTER:		EDITOR_MODE = 0;
+			case KEY_R:
+				for (j = 0; j < LED_MATRIX_OUT; j++) {
+					rgb[j][RED] = 0xFF;
+					rgb[j][GREEN] = 0x00;
+					rgb[j][BLUE] = 0x00;
+				}
+			case KEY_G:
+				for (j = 0; j < LED_MATRIX_OUT; j++) {
+					rgb[j][RED] = 0x00;
+					rgb[j][GREEN] = 0xFF;
+					rgb[j][BLUE] = 0x00;
+				}
+			case KEY_B:
+				for (j = 0; j < LED_MATRIX_OUT; j++) {
+					rgb[j][RED] = 0x00;
+					rgb[j][GREEN] = 0x00;
+					rgb[j][BLUE] = 0xFF;
+				}
+		}
 	}
-
-
-	PORTA = (i & 0x0F) | (((rgb[i][RED] << 8) & 0x01) >> 1) | (((rgb[i][GREEN] << 8) & 0x01) >> 2) | (((rgb[i][BLUE] << 8) & 0x01) >> 3);
-	PORTC = 0x00FF & rgb[i][RED];
-	PORTD = 0x00FF & rgb[i][GREEN];
-	PORTF = 0x00FF & rgb[i][BLUE];
 }
 
 // This interrupt routine is run approx 61 times per second.
@@ -196,7 +200,9 @@ ISR(TIMER0_OVF_vect)
 				keyboard_keys[i] = fn_map(keyboard_keys[i]);
 		}
 
-		if (!EDITOR_MODE)
+		if (EDITOR_MODE)
+			editor_data_send();
+		else
 			usb_keyboard_send();
 	
 		keyboard_modifer_keys = 0;
@@ -208,11 +214,233 @@ ISR(TIMER0_OVF_vect)
 	}
 }
 
-uint
+// This interrupt routine is run approx 61 times per second.
+// Updates the LED lighting scheme
+ISR(TIMER0_OVF_vect)
+{
+	static uint8_t count = 0;
+	static uint8_t state[2] = {0,0};
+
+	if (count < 62) {
+		count++;
+		return;
+	}
+	count = 0;
+
+	uint8_t i, j, temp;
+
+	switch(LIGHTING_MODE) {
+		case TOUCH_LMODE:
+			break;
+		case LEFT_WAVE_LMODE:
+			break;
+		case RIGHT_WAVE_LMODE:
+			break;
+		case SNAKE_LMODE:
+			if ((state[0] % 2) == 0) {
+				if (state[1] < 4*KEYBOARD_WIDTH)
+					state[1]++;
+				else
+					state[0]++;
+			} else {
+				if (state[1] > 0)
+					state[1]--;
+				else if (state[0] < KEYBOARD_HEIGHT)
+					state[0]++;
+				else
+					state[0] = 0;
+			}
+			led_arr[state[0]][state[1]] == 1;
+
+			break;
+		default:
+			break;
+	}
+
+	// Check which LEDs will be on at this point in time
+	for (i=0; i < KEYBOARD_WIDTH*4; i++)
+		for (j = 0; j < KEYBOARD_HEIGHT)
+			if (led_arr[i][j])
+				led_map_red(i,j);
+
+	// copy the data from previous loop to all colors
+	for (i = 0; i < LED_MATRIX_OUT; i++) {
+		led_port[i][GREEN] = led_port[i][RED];
+		led_port[i][BLUE] = led_port[i][RED];
+	}
+
+	// apply color changes to the led arrays
+	for (i = 0; i < LED_MATRIX_OUT; i++) {
+		led_port[i][RED] &= rgb[i][RED];
+		led_port[i][GREEN] &= rgb[i][GREEN];
+		led_port[i][BLUE] &= rgb[i][BLUE];
+	}
+}	
+
+uint8_t led_map_red(uint8_t x, uint8_t y)
+{
+	switch(y) {
+		case 0:
+			if (x < 4)
+				led_port[0][RED] |= 1 << 0;
+			else if (x < 8)
+				led_port[1][RED] |= 1 << 0;
+			else if (x < 12)
+				led_port[0][RED] |= 1 << 1;
+			else if (x < 16)
+				led_port[1][RED] |= 1 << 1;
+			else if (x < 20)
+				led_port[0][RED] |= 1 << 2;
+			else if (x < 24)
+				led_port[1][RED] |= 1 << 2;
+			else if (x < 28)
+				led_port[0][RED] |= 1 << 3;
+			else if (x < 32)
+				led_port[1][RED] |= 1 << 3;
+			else if (x < 36)
+				led_port[0][RED] |= 1 << 4;
+			else if (x < 40)
+				led_port[1][RED] |= 1 << 4;
+			else if (x < 44)
+				led_port[0][RED] |= 1 << 5;
+			else if (x < 48)
+				led_port[1][RED] |= 1 << 5;
+			else if (x < 52)
+				led_port[0][RED] |= 1 << 6;
+			else if (x < 60)
+				led_port[1][RED] |= 1 << 6;
+			else if (x < 64)
+				led_port[0][RED] |= 1 << 7;
+			else if (x < 68)
+				led_port[1][RED] |= 1 << 7;
+			return 0;
+		case 1:
+			if (x < 6)
+				led_port[2][RED] |= 1 << 0;
+			else if (x < 10)
+				led_port[3][RED] |= 1 << 0;
+			else if (x < 14)
+				led_port[2][RED] |= 1 << 1;
+			else if (x < 18)
+				led_port[3][RED] |= 1 << 1;
+			else if (x < 22)
+				led_port[2][RED] |= 1 << 2;
+			else if (x < 26)
+				led_port[3][RED] |= 1 << 2;
+			else if (x < 30)
+				led_port[2][RED] |= 1 << 3;
+			else if (x < 34)
+				led_port[3][RED] |= 1 << 3;
+			else if (x < 38)
+				led_port[2][RED] |= 1 << 4;
+			else if (x < 42)
+				led_port[3][RED] |= 1 << 4;
+			else if (x < 46)
+				led_port[2][RED] |= 1 << 5;
+			else if (x < 50)
+				led_port[3][RED] |= 1 << 5;
+			else if (x < 54)
+				led_port[2][RED] |= 1 << 6;
+			else if (x < 60)
+				led_port[3][RED] |= 1 << 6;
+			else if (x < 64)
+				led_port[2][RED] |= 1 << 7;
+			else if (x < 68)
+				led_port[3][RED] |= 1 << 7;
+			return 0;
+		case 2:
+			if (x < 7)
+				led_port[4][RED] |= 1 << 0;
+			else if (x < 11)
+				led_port[5][RED] |= 1 << 0;
+			else if (x < 15)
+				led_port[4][RED] |= 1 << 1;
+			else if (x < 19)
+				led_port[5][RED] |= 1 << 1;
+			else if (x < 23)
+				led_port[4][RED] |= 1 << 2;
+			else if (x < 27)
+				led_port[5][RED] |= 1 << 2;
+			else if (x < 31)
+				led_port[4][RED] |= 1 << 3;
+			else if (x < 35)
+				led_port[5][RED] |= 1 << 3;
+			else if (x < 39)
+				led_port[4][RED] |= 1 << 4;
+			else if (x < 43)
+				led_port[5][RED] |= 1 << 4;
+			else if (x < 47)
+				led_port[4][RED] |= 1 << 5;
+			else if (x < 51)
+				led_port[5][RED] |= 1 << 5;
+			else if (x < 60)
+				led_port[4][RED] |= 1 << 6;
+			else if (x < 64)
+				led_port[4][RED] |= 1 << 7;
+			else if (x < 68)
+				led_port[5][RED] |= 1 << 7;
+			return 0;
+		case 3:
+			if (x < 9)
+				led_port[6][RED] |= 1 << 0;
+			else if (x < 13)
+				led_port[6][RED] |= 1 << 1;
+			else if (x < 17)
+				led_port[7][RED] |= 1 << 1;
+			else if (x < 21)
+				led_port[6][RED] |= 1 << 2;
+			else if (x < 25)
+				led_port[7][RED] |= 1 << 2;
+			else if (x < 29)
+				led_port[6][RED] |= 1 << 3;
+			else if (x < 33)
+				led_port[7][RED] |= 1 << 3;
+			else if (x < 37)
+				led_port[6][RED] |= 1 << 4;
+			else if (x < 41)
+				led_port[7][RED] |= 1 << 4;
+			else if (x < 45)
+				led_port[6][RED] |= 1 << 5;
+			else if (x < 49)
+				led_port[7][RED] |= 1 << 5;
+			else if (x < 60)
+				led_port[6][RED] |= 1 << 6;
+			else if (x < 64)
+				led_port[6][RED] |= 1 << 7;
+			else if (x < 68)
+				led_port[7][RED] |= 1 << 7;
+			return 0;
+		case 4:
+			if (x < 5)
+				led_port[8][RED] |= 1 << 0;
+			else if (x < 10)
+				led_port[7][RED] |= 1 << 0;
+			else if (x < 15)
+				led_port[8][RED] |= 1 << 1;
+			else if (x < 41)
+				led_port[8][RED] |= 1 << 3;
+			else if (x < 46)
+				led_port[8][RED] |= 1 << 4;
+			else if (x < 51)
+				led_port[8][RED] |= 1 << 5;
+			else if (x < 56)
+				led_port[8][RED] |= 1 << 6;
+			else if (x < 60)
+				led_port[5][RED] |= 1 << 6;
+			else if (x < 64)
+				led_port[7][RED] |= 1 << 6;
+			else if (x < 68)
+				led_port[8][RED] |= 1 << 7;
+			return 0;
+		default:
+			return 1;
+	}
+	return 1;
+}
 
 uint8_t key_map (uint8_t km_in, uint8_t km_out)
 {
-    switch (km_out) {
+	switch (km_out) {
 		case 0:	switch (km_in) {
 			case 0:  return KEY_ESC;
 			case 1:  return KEY_1;
