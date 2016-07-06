@@ -183,7 +183,6 @@ ISR(TIMER0_OVF_vect)
 	uint8_t i;
 
 	key_matrix_out[cycle_count] = ((PINB & 0x70) >> 4) || ((PINE & 0xC0) >> 3);
-//	key_matrix_out[cycle_count] = 1;
 
 	for (i = 0; i < KEY_MATRIX_OUT; i++) {
 		if ((key_matrix_out[cycle_count] & (1 << i)) == 0 && key_count < MAX_NUM_KEYS) {
@@ -216,6 +215,7 @@ ISR(TIMER0_OVF_vect)
 
 // This interrupt routine is run approx 61 times per second.
 // Updates the LED lighting scheme
+/*
 ISR(TIMER0_OVF_vect)
 {
 	static uint8_t count = 0;
@@ -276,7 +276,7 @@ ISR(TIMER0_OVF_vect)
 		led_port[i][BLUE] &= rgb[i][BLUE];
 	}
 }	
-
+*/
 uint8_t led_map_red(uint8_t x, uint8_t y)
 {
 	switch(y) {
@@ -549,9 +549,21 @@ uint8_t fn_map( uint8_t key )
 		case KEY_DELETE: 	return KEY_INSERT;
 		case KEY_NUM_LOCK:	return KEY_SCROLL_LOCK;
 		case KEY_PRINTSCREEN:	return KEY_PAUSE;
-		case KEY_ENTER:		EDITOR_MODE = 1;
+//		case KEY_ENTER:		EDITOR_MODE = 1;
+		case KEY_1:		return KEY_F1;
+		case KEY_2:		return KEY_F2;
+		case KEY_3:		return KEY_F3;
+		case KEY_4:		return KEY_F4;
+		case KEY_5:		return KEY_F5;
+		case KEY_6:		return KEY_F6;
+		case KEY_7:		return KEY_F7;
+		case KEY_8:		return KEY_F8;
+		case KEY_9:		return KEY_F9;
+		case KEY_0:		return KEY_F10;
+		case KEY_MINUS:		return KEY_F11;
+		case KEY_PLUS:		return KEY_F12;
 		default:		return key;
 	}
 
-	return 0;
+	return key;
 }
