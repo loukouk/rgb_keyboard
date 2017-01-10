@@ -56,10 +56,10 @@ uint8_t led_arr[4*KEYBOARD_WIDTH][KEYBOARD_HEIGHT];
 uint8_t led_port[LED_MATRIX_OUT][3];
 uint8_t EDITOR_MODE = 0;
 uint8_t LIGHTING_MODE = DEFAULT_LMODE;
-
-uint8_t key_count = 0;
-uint8_t key_map (uint8_t, uint8_t);
 uint8_t KEY_FN = 0;
+
+uint8_t key_map (uint8_t, uint8_t);
+uint8_t fn_map( uint8_t key );
 
 int main(void)
 {
@@ -81,11 +81,11 @@ int main(void)
 	DDRD = 0xFF;
 	PORTD = 0x00;
 	// Configure PORTE 6:7 as inputs and 0:5 as outputs
-	DDRD = 0xFC;
-	PORTD = 0x03;
+	DDRE = 0x3F;
+	PORTE = 0xC0;
 	// Configure PORTF as outputs
-	DDRD = 0xFF;
-	PORTD = 0x00;
+	DDRF = 0xFF;
+	PORTF = 0x00;
 
 	// Initialize the USB, and then wait for the host to set configuration.
 	// If the Teensy is powered without a PC connected to the USB port,
@@ -98,34 +98,58 @@ int main(void)
 	_delay_ms(1000);
 
 	// Configure timer 0 to generate a timer overflow interrupt every
-	// 256*1024 clock cycles, or approx 61 Hz when using 16 MHz clock
-	// Read a new segment of keyboard matrix at each overflow
+	// 256*64 clock cycles, or approx 975 Hz (61*16 Hz) when using 16 MHz clock
 	TCCR0A = 0x00;
-	TCCR0B = 0x05;
+	TCCR0B = 0x03;
 	TIMSK0 = (1<<TOIE0);
 
 	// Configure timer 0 to generate a timer overflow interrupt every
 	// 256*1024 clock cycles, or approx 61 Hz when using 16 MHz clock
 	// Update the LED lighting scheme at each overflow
-	TCCR2A = 0x00;
-	TCCR2B = 0x05;
-	TIMSK2 = (1<<TOIE0);
+//	TCCR2A = 0x00;
+//	TCCR2B = 0x05;
+//	TIMSK2 = (1<<TOIE0);
 
 	// initialize keyboard_keys array
-	key_count = 0;
 	for (i = 0; i < MAX_NUM_KEYS; i++)
 		keyboard_keys[i] = 0;
 
 
-	for (i = 0; i < LED_MATRIX_IN; i++) {
-		rgb[i][RED]   = 0b00001111;
-		rgb[i][GREEN] = 0b00110011;
-		rgb[i][BLUE]  = 0b01010101;
-	}
+//	for (i = 0; i < LED_MATRIX_IN; i++) {
+//		rgb[i][RED]   = 0b00001111;
+//		rgb[i][GREEN] = 0b00110011;
+//		rgb[i][BLUE]  = 0b01010101;
+//	}
+	
+	LED_ON;
+	sei();
 
 	while (1) {
-		
-		for (i = 0; i < LED_MATRIX_OUT; i++) {
+/*		
+//	if ((PORTB&0x0F) >= 16)
+//		PORTB &= 0xF0;
+//	else
+//		PORTB++;
+	PORTB |= 0x00;
+	
+	if (!(PINB & (1<<4)))
+		keyboard_keys[0] = KEY_A;
+	if (!(PINB & (1<<5)))
+		keyboard_keys[1] = KEY_B;
+	if (!(PINB & (1<<6)))
+		keyboard_keys[2] = KEY_C;
+	if (!(PINE & (1<<6)))
+		keyboard_keys[3] = KEY_D;
+	if (!(PINE & (1<<7)))
+		keyboard_keys[4] = KEY_E;
+
+	usb_keyboard_send();
+	
+	for (i = 0; i < MAX_NUM_KEYS; i++)
+		keyboard_keys[i] = 0;
+	_delay_ms(100);
+*/
+/*		for (i = 0; i < LED_MATRIX_OUT; i++) {
 
 			PORTA = i;
 			PORTC = led_port[RED];
@@ -139,7 +163,7 @@ int main(void)
 			PORTD = 0x00;
 			PORTF = 0x00;
 		}
-	}
+*/	}
 }
 
 void editor_data_send()
@@ -178,20 +202,25 @@ void editor_data_send()
 // USB and resets all variables to start over
 ISR(TIMER0_OVF_vect)
 {
-	static uint8_t key_count = 0, cycle_count = 0, count = 0;
+	static uint8_t key_count = 0, cycle_count = 0;
 	static uint8_t key_matrix_out[KEY_MATRIX_IN];
-	uint8_t i;
+	uint8_t i, key;
 
-	key_matrix_out[cycle_count] = ((PINB & 0x70) >> 4) || ((PINE & 0xC0) >> 3);
+	key_matrix_out[cycle_count]  = 0x00;
+	key_matrix_out[cycle_count] |= ((PINB & 0x70) >> 4);
+	key_matrix_out[cycle_count] |= ((PINE & 0xC0) >> 3);
 
 	for (i = 0; i < KEY_MATRIX_OUT; i++) {
 		if ((key_matrix_out[cycle_count] & (1 << i)) == 0 && key_count < MAX_NUM_KEYS) {
-			keyboard_keys[key_count] = key_map(cycle_count, i);
-			key_count++;
+			key = key_map(cycle_count, i);
+			if (key) {
+				keyboard_keys[key_count] = key;
+				key_count++;
+			}
 		}
 	}
 
-	PORTB = cycle_count++;
+	cycle_count++;
 	if (cycle_count >= KEY_MATRIX_IN) {
 
 		if (KEY_FN) {
@@ -199,24 +228,27 @@ ISR(TIMER0_OVF_vect)
 				keyboard_keys[i] = fn_map(keyboard_keys[i]);
 		}
 
-		if (EDITOR_MODE)
-			editor_data_send();
-		else
-			usb_keyboard_send();
+//		if (EDITOR_MODE)
+//			editor_data_send();
+//		else
+		usb_keyboard_send();
 	
-		keyboard_modifer_keys = 0;
+		keyboard_modifier_keys = 0;
 		cycle_count = 0;
 		key_count = 0;
 		KEY_FN = 0;
 		for (i = 0; i < MAX_NUM_KEYS; i++)
 			keyboard_keys[i] = 0;
 	}
+	
+	PORTB &= 0xF0;
+	PORTB |= cycle_count;
 }
 
 // This interrupt routine is run approx 61 times per second.
 // Updates the LED lighting scheme
 /*
-ISR(TIMER0_OVF_vect)
+ISR(TIMER2_OVF_vect)
 {
 	static uint8_t count = 0;
 	static uint8_t state[2] = {0,0};
@@ -277,6 +309,7 @@ ISR(TIMER0_OVF_vect)
 	}
 }	
 */
+/*
 uint8_t led_map_red(uint8_t x, uint8_t y)
 {
 	switch(y) {
@@ -437,103 +470,102 @@ uint8_t led_map_red(uint8_t x, uint8_t y)
 	}
 	return 1;
 }
-
+*/
 uint8_t key_map (uint8_t km_in, uint8_t km_out)
 {
 	switch (km_out) {
-		case 0:	switch (km_in) {
-			case 0:  return KEY_ESC;
-			case 1:  return KEY_1;
-			case 2:  return KEY_2;
-			case 3:  return KEY_3;
-			case 4:  return KEY_4;
-			case 5:  return KEY_5;
-			case 6:  return KEY_6;
-			case 7:  return KEY_7;
-			case 8:  return KEY_8;
-			case 9:  return KEY_9;
-			case 10: return KEY_0;
-			case 11: return KEY_MINUS;
-			case 12: return KEY_EQUAL;
-			case 13: return KEY_BACKSPACE;
-			case 14: return KEY_DELETE;
-			case 15: return KEY_NUM_LOCK;
+		case 4:	switch (km_in) {
+			case 15: return KEY_ESC;
+			case 14: return KEY_1;
+			case 13: return KEY_2;
+			case 12: return KEY_3;
+			case 11: return KEY_4;
+			case 10: return KEY_5;
+			case 9:  return KEY_6;
+			case 8:  return KEY_7;
+			case 7:  return KEY_8;
+			case 6:  return KEY_9;
+			case 5:  return KEY_0;
+			case 4:  return KEY_MINUS;
+			case 3:  return KEY_EQUAL;
+			case 2:  return KEY_BACKSPACE;
+			case 1:  return KEY_DELETE;
+			case 0:  return KEY_NUM_LOCK;
 			default: return 0;
 		}
-		case 1:	switch (km_in) {
-			case 0:  return KEY_TAB;
-			case 1:  return KEY_Q;
-			case 2:  return KEY_W;
-			case 3:  return KEY_E;
-			case 4:  return KEY_R;
-			case 5:  return KEY_T;
-			case 6:  return KEY_Y;
-			case 7:  return KEY_U;
-			case 8:  return KEY_I;
-			case 9:  return KEY_O;
-			case 10: return KEY_P;
-			case 11: return KEY_LEFT_BRACE;
-			case 12: return KEY_RIGHT_BRACE;
-			case 13: return KEY_BACKSLASH;
-			case 14: return KEY_PAGE_UP;
-			case 15: return KEY_HOME;
+		case 3:	switch (km_in) {
+			case 15: return KEY_TAB;
+			case 14: return KEY_Q;
+			case 13: return KEY_W;
+			case 12: return KEY_E;
+			case 11: return KEY_R;
+			case 10: return KEY_T;
+			case 9:  return KEY_Y;
+			case 8:  return KEY_U;
+			case 7:  return KEY_I;
+			case 6:  return KEY_O;
+			case 5:  return KEY_P;
+			case 4:  return KEY_LEFT_BRACE;
+			case 3:  return KEY_RIGHT_BRACE;
+			case 2:  return KEY_BACKSLASH;
+			case 1:  return KEY_PAGE_UP;
+			case 0:  return KEY_HOME;
 			default: return 0;
 		}
 		case 2:	switch (km_in) {
-			case 0:  return KEY_CAPS_LOCK;
-			case 1:  return KEY_A;
-			case 2:  return KEY_S;
-			case 3:  return KEY_D;
-			case 4:  return KEY_F;
-			case 5:  return KEY_G;
-			case 6:  return KEY_H;
-			case 7:  return KEY_J;
-			case 8:  return KEY_K;
-			case 9:  return 0;
-			case 10: return KEY_L;
-			case 11: return KEY_SEMICOLON;
-			case 12: return KEY_QUOTE;
-			case 13: return KEY_ENTER;
-			case 14: return KEY_PAGE_DOWN;
-			case 15: return KEY_END;
+			case 15: return KEY_CAPS_LOCK;
+			case 14: return KEY_A;
+			case 13: return KEY_S;
+			case 12: return KEY_D;
+			case 11: return KEY_F;
+			case 10: return KEY_G;
+			case 9:  return KEY_H;
+			case 8:  return KEY_J;
+			case 7:  return KEY_K;
+			case 5:  return KEY_L;
+			case 4:  return KEY_SEMICOLON;
+			case 3:  return KEY_QUOTE;
+			case 2:  return KEY_ENTER;
+			case 1:  return KEY_PAGE_DOWN;
+			case 0:  return KEY_END;
 			default: return 0; 
 		}
-		case 3:	switch (km_in) {
-			case 0:  keyboard_modifier_keys |= KEY_LEFT_SHIFT;
-			case 1:  return 0
-			case 2:  return KEY_Z;
-			case 3:  return KEY_X;
-			case 4:  return KEY_C;
-			case 5:  return KEY_V;
-			case 6:  return KEY_B;
-			case 7:  return KEY_N;
-			case 8:  return KEY_M;
-			case 9:  return KEY_COMMA;
-			case 10: return KEY_PERIOD;
-			case 11: return KEY_SLASH;
-			case 12: return 0;
-			case 13: keyboard_modifier_keys |= KEY_RIGHT_SHIFT;
-			case 14: return KEY_UP;
-			case 15: return KEY_PRINTSCREEN;
+		case 1:	switch (km_in) {
+			case 15: keyboard_modifier_keys |= KEY_LEFT_SHIFT;
+				 return 0;
+			case 13: return KEY_Z;
+			case 12: return KEY_X;
+			case 11: return KEY_C;
+			case 10: return KEY_V;
+			case 9:  return KEY_B;
+			case 8:  return KEY_N;
+			case 7:  return KEY_M;
+			case 6:  return KEY_COMMA;
+			case 5:  return KEY_PERIOD;
+			case 4:  return KEY_SLASH;
+			case 2:  keyboard_modifier_keys |= KEY_RIGHT_SHIFT;
+				 return 0;
+			case 1:  return KEY_UP;
+			case 0:  return KEY_PRINTSCREEN;
 			default: return 0;
 		}
-		case 4:	switch (km_in) {
-			case 0:  keyboard_modifier_keys |= KEY_LEFT_CTRL;
-			case 1:  keyboard_modifier_keys |= KEY_GUI;
-			case 2:  keyboard_modifier_keys |= KEY_LEFT_ALT;
-			case 3:  return 0;
-			case 4:  return 0;
-			case 5:  return 0;
-			case 6:  return KEY_SPACE;
-			case 7:  return 0;
-			case 8:  return 0;
-			case 9:  return 0;
-			case 10: return KEY_RIGHT_ALT;
-			case 11: KEY_FN = 1;
-			case 12: keyboard_modifier_keys |= KEY_RIGHT_CTRL;
-			case 13: return KEY_LEFT;
-			case 14: return KEY_DOWN;
-			case 15: return KEY_RIGHT;
+		case 0:	switch (km_in) {
+			case 15: keyboard_modifier_keys |= KEY_LEFT_CTRL;
+				 return 0;
+			case 14: keyboard_modifier_keys |= KEY_GUI;
+				 return 0;
+			case 13: keyboard_modifier_keys |= KEY_LEFT_ALT;
+				 return 0;
+			case 9:  return KEY_SPACE;
+			case 5:  return KEY_RIGHT_ALT;
+				 return 0;
+			case 4:  KEY_FN = 1;
+				 return 0;
+			case 3:  keyboard_modifier_keys |= KEY_RIGHT_CTRL;
+				 return 0;
+			case 2:  return KEY_LEFT;
+			case 1:  return KEY_DOWN;
+			case 0:  return KEY_RIGHT;
 			default: return 0;
 		}
 		default: return 0;
@@ -561,7 +593,7 @@ uint8_t fn_map( uint8_t key )
 		case KEY_9:		return KEY_F9;
 		case KEY_0:		return KEY_F10;
 		case KEY_MINUS:		return KEY_F11;
-		case KEY_PLUS:		return KEY_F12;
+		case KEY_EQUAL:		return KEY_F12;
 		default:		return key;
 	}
 
